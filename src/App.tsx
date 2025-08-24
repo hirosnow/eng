@@ -1,10 +1,13 @@
 import React, { useState } from "react";
-import { QUESTIONS, type Word } from "./data/questions";
+import { QUESTIONS as DEFAULT_QUESTIONS, type Word, type Question } from "./data/questions";
 
 const App: React.FC = () => {
+
+  // 問題リスト（デフォルトは既存QUESTIONS、アップロードで差し替え）
+  const [questions, setQuestions] = useState<Question[]>(DEFAULT_QUESTIONS);
   // 現在の出題
   const [qIndex, setQIndex] = useState(0);
-  const correctOrder = QUESTIONS[qIndex].correctOrder;
+  const correctOrder = questions[qIndex].correctOrder;
 
   // 候補と解答欄
   const [pool, setPool] = useState<Word[]>(
@@ -13,6 +16,32 @@ const App: React.FC = () => {
   const [answer, setAnswer] = useState<Word[]>([]);
   const [wrongId, setWrongId] = useState<number | null>(null);
   const [isComplete, setIsComplete] = useState<boolean>(false);
+
+  // JSONファイルアップロード時の処理
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const json = JSON.parse(event.target?.result as string);
+        // 構造チェック: [{ jp: string, correctOrder: [{id, text}] }]
+        if (Array.isArray(json) && json.every(q => typeof q.jp === 'string' && Array.isArray(q.correctOrder))) {
+          setQuestions(json);
+          setQIndex(0);
+          setAnswer([]);
+          setPool([...json[0].correctOrder].sort(() => Math.random() - 0.5));
+          setWrongId(null);
+          setIsComplete(false);
+        } else {
+          alert('不正なJSON形式です。');
+        }
+      } catch {
+        alert('JSONの読み込みに失敗しました。');
+      }
+    };
+    reader.readAsText(file);
+  };
 
   const handleDropToAnswer = (word: Word) => {
     if (isComplete) return; // 完了中は入力不可
@@ -31,19 +60,19 @@ const App: React.FC = () => {
     setAnswer(newAnswer);
     setPool((prev) => prev.filter((w) => w.id !== word.id));
 
-    // すべて正しく並び終えたら達成演出 → 2秒後に次の問題
+    // すべて正しく並び終えたら達成演出 → 1秒後に次の問題
     if (newAnswer.length === correctOrder.length) {
       setIsComplete(true);
       setTimeout(() => {
-        const next = (qIndex + 1) % QUESTIONS.length;
-        const nextOrder = QUESTIONS[next].correctOrder;
+        const next = (qIndex + 1) % questions.length;
+        const nextOrder = questions[next].correctOrder;
 
         setQIndex(next);
         setAnswer([]);
         setPool([...nextOrder].sort(() => Math.random() - 0.5));
         setWrongId(null);
         setIsComplete(false);
-      }, 2000);
+      }, 1000);
     }
   };
 
@@ -150,8 +179,22 @@ const App: React.FC = () => {
       `}</style>
 
       <div className="wrap">
+        {/* JSONファイルアップロード */}
+        <div style={{ textAlign: "right", marginBottom: 8 }}>
+          <label style={{ cursor: "pointer" }}>
+            <input
+              type="file"
+              accept="application/json"
+              style={{ display: "none" }}
+              onChange={handleFileUpload}
+            />
+            <span style={{ border: "1px solid #aaa", borderRadius: 4, padding: "4px 10px", background: "#f7f7f7" }}>
+              JSONから出題を読み込む
+            </span>
+          </label>
+        </div>
         {/* お題（外部データの日本語） */}
-        <p className="prompt">{QUESTIONS[qIndex].jp}</p>
+  <p className="prompt">{questions[qIndex].jp}</p>
 
         {/* 解答エリア */}
         <div className="answerRowWrap">
