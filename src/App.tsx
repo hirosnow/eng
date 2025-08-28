@@ -16,6 +16,8 @@ const App: React.FC = () => {
   const [answer, setAnswer] = useState<Word[]>([]);
   const [wrongId, setWrongId] = useState<number | null>(null);
   const [isComplete, setIsComplete] = useState<boolean>(false);
+  // 1回でも間違えたかどうか
+  const [hasMistake, setHasMistake] = useState<boolean>(false);
 
   // JSONファイルアップロード時の処理
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -50,8 +52,10 @@ const App: React.FC = () => {
     const idx = newAnswer.length - 1;
 
     // 直後判定：位置が違えば戻す
+
     if (newAnswer[idx].id !== correctOrder[idx].id) {
       setWrongId(word.id);
+      setHasMistake(true);
       setTimeout(() => setWrongId(null), 500);
       return;
     }
@@ -60,26 +64,37 @@ const App: React.FC = () => {
     setAnswer(newAnswer);
     setPool((prev) => prev.filter((w) => w.id !== word.id));
 
-    // すべて正しく並び終えたら達成演出 → 1秒後に次の問題
+    // すべて正しく並び終えたら
     if (newAnswer.length === correctOrder.length) {
       setIsComplete(true);
-      setTimeout(() => {
-        const next = (qIndex + 1) % questions.length;
-        const nextOrder = questions[next].correctOrder;
-
-        setQIndex(next);
-        setAnswer([]);
-        setPool([...nextOrder].sort(() => Math.random() - 0.5));
-        setWrongId(null);
-        setIsComplete(false);
-      }, 1000);
+      if (hasMistake) {
+        // 間違えた場合はボタン表示で次へ
+        // 何もしない（ボタンで進める）
+      } else {
+        // 間違えなかった場合は1秒後に自動で次へ
+        setTimeout(() => {
+          goToNextQuestion();
+        }, 1000);
+      }
     }
+  };
+  // 次の問題へ進む処理
+  const goToNextQuestion = () => {
+    const next = (qIndex + 1) % questions.length;
+    const nextOrder = questions[next].correctOrder;
+    setQIndex(next);
+    setAnswer([]);
+    setPool([...nextOrder].sort(() => Math.random() - 0.5));
+    setWrongId(null);
+    setIsComplete(false);
+    setHasMistake(false);
   };
 
   return (
     <>
       <style>{`
         :root {
+          --container-width: 100%;
           --border: #000;
           --chip-bg: #fff;
           --chip-bg-ans: #fff;
@@ -177,12 +192,34 @@ const App: React.FC = () => {
           .answerRow { min-height: 48px; }
         }
       `}</style>
-
       <div className="wrap">
+        {/* qIndex 表示と選択 */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 12, gap: 12 }}>
+          <span>問題: </span>
+          <select
+            value={qIndex}
+            onChange={e => {
+              const idx = Number(e.target.value);
+              setQIndex(idx);
+              setAnswer([]);
+              setPool([...questions[idx].correctOrder].sort(() => Math.random() - 0.5));
+              setWrongId(null);
+              setIsComplete(false);
+            }}
+            style={{ fontSize: 16, padding: "2px 8px", borderRadius: 4 }}
+          >
+            {questions.map((_, i) => (
+              <option key={i} value={i}>
+                {i + 1}
+              </option>
+            ))}
+          </select>
+          <span>/ {questions.length}</span>
+        </div>
         {/* JSONファイルアップロード */}
         <div style={{ textAlign: "right", marginBottom: 8 }}>
           <label style={{ cursor: "pointer" }}>
-            <input
+              <input
               type="file"
               accept="application/json"
               style={{ display: "none" }}
@@ -194,7 +231,8 @@ const App: React.FC = () => {
           </label>
         </div>
         {/* お題（外部データの日本語） */}
-  <p className="prompt">{questions[qIndex].jp}</p>
+        <p className="prompt">{questions[qIndex].jp}</p>
+
 
         {/* 解答エリア */}
         <div className="answerRowWrap">
@@ -209,6 +247,25 @@ const App: React.FC = () => {
             ))}
           </div>
         </div>
+
+        {/* 次の問題ボタン（間違えた場合のみ表示） */}
+        {isComplete && hasMistake && (
+          <div style={{ margin: "24px 0" }}>
+            <button
+              onClick={goToNextQuestion}
+              style={{
+                fontSize: 18,
+                padding: "8px 24px",
+                borderRadius: 6,
+                border: "2px solid #000",
+                cursor: "pointer",
+                fontWeight: "bold"
+              }}
+            >
+              次の問題
+            </button>
+          </div>
+        )}
 
         {/* 候補エリア */}
         <div className="chips">
