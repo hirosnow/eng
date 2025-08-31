@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { QUESTIONS as DEFAULT_QUESTIONS, type Word, type Question } from "./data/questions";
 
 const App: React.FC = () => {
@@ -19,31 +19,25 @@ const App: React.FC = () => {
   // 1回でも間違えたかどうか
   const [hasMistake, setHasMistake] = useState<boolean>(false);
 
-  // JSONファイルアップロード時の処理
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      try {
-        const json = JSON.parse(event.target?.result as string);
-        // 構造チェック: [{ jp: string, correctOrder: [{id, text}] }]
-        if (Array.isArray(json) && json.every(q => typeof q.jp === 'string' && Array.isArray(q.correctOrder))) {
-          setQuestions(json);
-          setQIndex(0);
-          setAnswer([]);
-          setPool([...json[0].correctOrder].sort(() => Math.random() - 0.5));
-          setWrongId(null);
-          setIsComplete(false);
-        } else {
-          alert('不正なJSON形式です。');
-        }
-      } catch {
-        alert('JSONの読み込みに失敗しました。');
-      }
-    };
-    reader.readAsText(file);
-  };
+  // 音声ファイルを保持するMap
+  const [audioFiles, setAudioFiles] = useState<Map<string, File>>(new Map());
+  const audioRef = useRef<HTMLAudioElement>(null);
+
+  const inputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (inputRef.current) {
+      (inputRef.current as any).webkitdirectory = true;
+      (inputRef.current as any).directory = true;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (audioFiles.has(questions[qIndex].filename) && audioRef.current) {
+      audioRef.current.currentTime = 0;
+      audioRef.current.play().catch(() => {});
+    }
+    // eslint-disable-next-line
+  }, [qIndex, audioFiles]);
 
   const handleDropToAnswer = (word: Word) => {
     if (isComplete) return; // 完了中は入力不可
@@ -220,19 +214,70 @@ const App: React.FC = () => {
         <div style={{ textAlign: "right", marginBottom: 8 }}>
           <label style={{ cursor: "pointer" }}>
               <input
+              ref={inputRef}
               type="file"
-              accept="application/json"
+              accept="application/json,audio/*"
               style={{ display: "none" }}
-              onChange={handleFileUpload}
+              multiple
+              onChange={async (e) => {
+                const files = e.target.files;
+                if (!files || files.length === 0) return;
+                let allQuestions: Question[] = [];
+                let hasInvalid = false;
+                const audioMap = new Map<string, File>();
+                for (const file of Array.from(files)) {
+                  if (file.name.endsWith('.json')) {
+                    try {
+                      const text = await file.text();
+                      const json = JSON.parse(text);
+                      if (Array.isArray(json) && json.every(q => typeof q.jp === 'string' && Array.isArray(q.correctOrder))) {
+                        allQuestions = allQuestions.concat(json);
+                      } else {
+                        hasInvalid = true;
+                      }
+                    } catch {
+                      hasInvalid = true;
+                    }
+                  } else if (file.type.startsWith('audio/')) {
+                    audioMap.set(file.name, file);
+                  }
+                }
+                if (allQuestions.length === 0) {
+                  alert('有効なJSONファイルが見つかりませんでした。');
+                  return;
+                }
+                setQuestions(allQuestions);
+                setQIndex(0);
+                setAnswer([]);
+                setPool([...allQuestions[0].correctOrder].sort(() => Math.random() - 0.5));
+                setWrongId(null);
+                setIsComplete(false);
+                setAudioFiles(audioMap);
+                if (hasInvalid) {
+                  alert('一部のファイルは不正な形式だったためスキップされました。');
+                }
+              }}
             />
             <span style={{ border: "1px solid #aaa", borderRadius: 4, padding: "4px 10px", background: "#f7f7f7" }}>
-              JSONから出題を読み込む
+              ディレクトリから出題を読み込む
             </span>
           </label>
         </div>
         {/* お題（外部データの日本語） */}
         <p className="prompt">{questions[qIndex].jp}</p>
-
+        {/* 音声再生エリア */}
+        {audioFiles.has(questions[qIndex].filename) && (
+          <audio
+            key={questions[qIndex].filename}
+            ref={audioRef}
+            controls
+            autoPlay
+            style={{ margin: '12px 0' }}
+          >
+            <source src={URL.createObjectURL(audioFiles.get(questions[qIndex].filename)!)} />
+            お使いのブラウザはaudioタグに対応していません。
+          </audio>
+        )}
 
         {/* 解答エリア */}
         <div className="answerRowWrap">

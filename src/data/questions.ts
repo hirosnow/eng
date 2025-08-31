@@ -1,9 +1,10 @@
 // 出題データ（外部化）
 export type Word = { id: number; text: string };
-export type Question = { jp: string; correctOrder: Word[] };
+export type Question = { filename: string; jp: string; correctOrder: Word[] };
 
 export const QUESTIONS: Question[] = [
   {
+    filename: "q1.mp3",
     jp: "ランチミーティングで仲間との親睦を深めた",
     correctOrder: [
       { id: 1, text: "I" },
@@ -19,6 +20,7 @@ export const QUESTIONS: Question[] = [
     ]
   },
   {
+    filename: "q2.mp3",
     jp: "私は毎朝コーヒーを一杯飲む",
     correctOrder: [
       { id: 1, text: "I" },
