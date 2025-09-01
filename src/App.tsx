@@ -88,12 +88,15 @@ const App: React.FC = () => {
     <>
       <style>{`
         :root {
-          --container-width: 100%;
           --border: #000;
           --chip-bg: #fff;
           --chip-bg-ans: #fff;
           --chip-bg-ans-done: #ffe6ef; /* 達成時の薄ピンク */
           --text: #000;
+        }
+        #root {
+          width: 100%;
+          margin: 0 auto;
         }
         .wrap {
           font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans JP", sans-serif;
