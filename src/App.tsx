@@ -8,6 +8,8 @@ const App: React.FC = () => {
   // 現在の出題
   const [qIndex, setQIndex] = useState(0);
   const correctOrder = questions[qIndex].correctOrder;
+  // 間違えた問題を記録するための状態
+  const wrongQuestionsRef = useRef<Question[]>([]);
 
   // 候補と解答欄
   const [pool, setPool] = useState<Word[]>(
@@ -64,6 +66,12 @@ const App: React.FC = () => {
       if (hasMistake) {
         // 間違えた場合はボタン表示で次へ
         // 何もしない（ボタンで進める）
+        // 音声を再生する
+        if (!!audioRef.current) {
+          audioRef.current.currentTime = 0;
+          audioRef.current.play();
+        }
+        wrongQuestionsRef.current.push(questions[qIndex]);
       } else {
         // 間違えなかった場合は1秒後に自動で次へ
         setTimeout(() => {
@@ -74,6 +82,20 @@ const App: React.FC = () => {
   };
   // 次の問題へ進む処理
   const goToNextQuestion = () => {
+    // 最後の問題の後なら復習モードへ
+    if (qIndex === questions.length - 1) {
+      if (wrongQuestionsRef.current.length > 0) {
+        setQuestions([...wrongQuestionsRef.current]);
+        setQIndex(0);
+        setAnswer([]);
+        setPool([...wrongQuestionsRef.current[0].correctOrder].sort(() => Math.random() - 0.5));
+        setWrongId(null);
+        setIsComplete(false);
+        setHasMistake(false);
+        wrongQuestionsRef.current = [];
+        return;
+      }
+    }
     const next = (qIndex + 1) % questions.length;
     const nextOrder = questions[next].correctOrder;
     setQIndex(next);
